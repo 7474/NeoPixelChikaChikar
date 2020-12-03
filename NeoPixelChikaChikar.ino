@@ -5,11 +5,18 @@
     FastLED: https://github.com/FastLED/FastLED
 */
 #include <M5Stack.h>
-#include "FastLED.h"
 
+// https://github.com/adafruit/Adafruit_NeoPixe
+#include <Adafruit_NeoPixel.h>
 #define Neopixel_PIN 21
 #define NUM_LEDS 15
 
+Adafruit_NeoPixel pixels(NUM_LEDS, Neopixel_PIN, NEO_GRB + NEO_KHZ800);
+struct CRGB {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+};
 CRGB leds[NUM_LEDS];
 static TaskHandle_t FastLEDshowTaskHandle = 0;
 static TaskHandle_t userTaskHandle = 0;
@@ -25,7 +32,15 @@ char ledLabelG[8];
 char ledLabelB[8];
 char ledBuf[128];
 
+void fill_solid(CRGB* pLeds, int num, const CRGB& val) {
+  while (num-- > 0) {
+    *pLeds = val;
+    pLeds++;
+  }
+}
+
 void updateLeds() {
+  // Update LCD
   M5.Lcd.fillRect(0, 120, 320, 100, 0);
   M5.Lcd.fillRect(0, 140, 80, 8, M5.Lcd.color565(
                     leds[ledCurrentNum].r,
@@ -40,7 +55,13 @@ void updateLeds() {
           leds[ledCurrentNum].b);
   M5.Lcd.drawString(ledBuf, 2, 122, 1);
   Serial.println(ledBuf);
-  FastLED.show();
+
+  // Update pixels
+  pixels.setPixelColor(ledCurrentNum, pixels.Color(
+                         leds[ledCurrentNum].r,
+                         leds[ledCurrentNum].g,
+                         leds[ledCurrentNum].b));
+  pixels.show();
 }
 void ledNumSel(MenuItem* mi) {
   if (ledCurrentNum + 1 < NUM_LEDS) {
@@ -68,15 +89,8 @@ void setup() {
   M5.Power.begin();
 
   // Neopixel initialization
+  pixels.begin();
   fill_solid(leds, NUM_LEDS, CRGB{0, 0, 0});
-  // https://www.switch-science.com/catalog/5208/
-  // SK6812
-  // https://www.switch-science.com/catalog/6058/
-  // SK6812
-  // NEOPIXEL
-  FastLED.addLeds<SK6812,Neopixel_PIN,GRB>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
-  FastLED.setBrightness(10);
-  FastLED.show();
   xTaskCreatePinnedToCore(FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2, NULL, 1);
 
   tv.clientRect.x = 2;
@@ -98,15 +112,15 @@ void setup() {
 
 void loop()
 {
-  Serial.println("loop");
+  //  Serial.println("loop");
   tv.update();
 }
 
 void FastLEDshowTask(void *pvParameters)
 {
   for (;;) {
-//    FastLED.show();
+    //    Serial.println("FastLEDshowTask");
+    //    FastLED.show();
     delay(100);
-    Serial.println("FastLEDshowTask");
   }
 }
