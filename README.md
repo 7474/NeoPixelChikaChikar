@@ -4,6 +4,9 @@ My M5Stack Basic + NeoPixel Sketch Repository.
 
 ## Feature
 
+Light NeoPixel in any pattern.
+
+Play mp3 files on the built-in speaker.
 
 ## Dependencies
 
