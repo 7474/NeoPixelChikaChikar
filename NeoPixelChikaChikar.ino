@@ -7,7 +7,7 @@
 // https://github.com/adafruit/Adafruit_NeoPixel
 #include <Adafruit_NeoPixel.h>
 #define Neopixel_PIN 21
-#define Neopixel_NUM_LEDS 15
+#define Neopixel_NUM_LEDS 45
 
 Adafruit_NeoPixel pixels(Neopixel_NUM_LEDS, Neopixel_PIN, NEO_GRB + NEO_KHZ800);
 struct CRGB {
