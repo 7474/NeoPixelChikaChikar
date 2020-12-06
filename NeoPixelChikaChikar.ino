@@ -1,9 +1,3 @@
-// https://github.com/m5stack/M5Stack/edit/master/examples/Unit/RGB_LED_SK6812/display_rainbow/display_rainbow.ino
-/*
-    Description: Control RGB LED to run rainbow light show
-    Please install library before compiling:
-    FastLED: https://github.com/FastLED/FastLED
-*/
 #include <M5Stack.h>
 
 // LCD
@@ -13,17 +7,20 @@
 // https://github.com/adafruit/Adafruit_NeoPixe
 #include <Adafruit_NeoPixel.h>
 #define Neopixel_PIN 21
-#define NUM_LEDS 15
+#define Neopixel_NUM_LEDS 15
 
-Adafruit_NeoPixel pixels(NUM_LEDS, Neopixel_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel pixels(Neopixel_NUM_LEDS, Neopixel_PIN, NEO_GRB + NEO_KHZ800);
 struct CRGB {
   uint8_t r;
   uint8_t g;
   uint8_t b;
 };
-CRGB leds[NUM_LEDS];
-static TaskHandle_t FastLEDshowTaskHandle = 0;
+CRGB leds[Neopixel_NUM_LEDS];
+static TaskHandle_t LEDshowTaskHandle = 0;
 static TaskHandle_t userTaskHandle = 0;
+
+#include <LEDAnimator.h>
+LEDAnimator<Neopixel_NUM_LEDS> ledAnimator(Neopixel_NUM_LEDS, Neopixel_PIN, NEO_GRB + NEO_KHZ800);
 
 // BGM
 #include <M5BGMPlayer.h>
@@ -72,6 +69,7 @@ void updateLeds() {
   Serial.println(ledBuf);
 
   // Update pixels
+  ledAnimator.stop();
   pixels.setPixelColor(ledCurrentNum, pixels.Color(
                          leds[ledCurrentNum].r,
                          leds[ledCurrentNum].g,
@@ -81,7 +79,7 @@ void updateLeds() {
 
 // Callbask
 void ledNumSel(MenuItem* mi) {
-  if (ledCurrentNum + 1 < NUM_LEDS) {
+  if (ledCurrentNum + 1 < Neopixel_NUM_LEDS) {
     ledCurrentNum += 1;
   } else {
     ledCurrentNum = 0;
@@ -101,16 +99,24 @@ void ledBSel(MenuItem* mi) {
   updateLeds();
 }
 
+void ledAnimeSel(MenuItem* mi) {
+  if (ledAnimator.isPlaying()) {
+    ledAnimator.stop();
+  } else {
+    ledAnimator.start();
+  }
+}
+
 void bgmSel(MenuItem* mi) {
   int no = mi->tag;
   M5BGMPlayerTrack *selectedTrack = NULL;
   for (M5BGMPlayerTrack *tmpTrack = bgm.trackList(); tmpTrack; tmpTrack = tmpTrack->right) {
     if (tmpTrack->no == no) {
-      selectedTrack=tmpTrack;
+      selectedTrack = tmpTrack;
       break;
     }
   }
-  if(selectedTrack) {
+  if (selectedTrack) {
     bgmTrack = selectedTrack;
     bgmDesire = Play;
   }
@@ -126,10 +132,39 @@ void setupM5() {
   Serial.println("End SD.begin()");
 }
 
+LEDAnimatorFrame<Neopixel_NUM_LEDS> ssjFrames[15];
 void setupNeoPixel() {
   pixels.begin();
-  fill_solid(leds, NUM_LEDS, CRGB{0, 0, 0});
-  xTaskCreatePinnedToCore(FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2, NULL, 0);
+  fill_solid(leds, Neopixel_NUM_LEDS, CRGB{0, 0, 0});
+
+  LEDAnimatorCRGB ssj0 = LEDAnimatorCRGB{0, 0, 0};
+  LEDAnimatorCRGB ssj1 = LEDAnimatorCRGB{32, 16, 0};
+  LEDAnimatorCRGB ssj2 = LEDAnimatorCRGB{24, 16, 0};
+  LEDAnimatorCRGB ssj3 = LEDAnimatorCRGB{8, 8, 0};
+  for (int i = 0; i < 15; i++) {
+    ssjFrames[i].frameType = Solid;
+    ssjFrames[i].millis = 50;
+    for (int j =  0; j < Neopixel_NUM_LEDS; j++) {
+      switch ((Neopixel_NUM_LEDS * 15 - i + j) % 5) {
+        case 0:
+          ssjFrames[i].leds[j] = ssj3;
+          break;
+        case 1:
+          ssjFrames[i].leds[j] = ssj2;
+          break;
+        case 2:
+          ssjFrames[i].leds[j] = ssj1;
+          break;
+        default:
+          ssjFrames[i].leds[j] = ssj0;
+          break;
+      }
+    }
+  }
+  ledAnimator.setFrames(ssjFrames, 15);
+  ledAnimator.printFrames();
+
+  xTaskCreatePinnedToCore(LEDshowTask, "LEDshowTask", 2048, NULL, 2, NULL, 0);
 }
 
 void setupBgm() {
@@ -152,9 +187,11 @@ void setupBgm() {
 void setupMenu() {
   std::vector<MenuItem*> bgmMenu;
   for (M5BGMPlayerTrack *tmpTrack = bgm.trackList(); tmpTrack; tmpTrack = tmpTrack->right) {
-    bgmMenu.push_back(new MenuItem(tmpTrack->path,tmpTrack->no, bgmSel));
+    bgmMenu.push_back(new MenuItem(tmpTrack->path, tmpTrack->no, bgmSel));
     Serial.println(tmpTrack->path);
   }
+  std::vector<MenuItem*> ledMenu;
+  ledMenu.push_back(new MenuItem("SSJ Static", 0, ledAnimeSel));
   // Menu initialization
   tv.clientRect.x = 0;
   tv.clientRect.y = 120;
@@ -168,6 +205,7 @@ void setupMenu() {
       , new MenuItem("B", ledBSel)
     }),
     new MenuItem("BGM", bgmMenu),
+    new MenuItem("LED", ledMenu),
   });
   tv.begin();
 }
@@ -205,12 +243,11 @@ void loop()
 }
 
 // Task
-void FastLEDshowTask(void *pvParameters)
+void LEDshowTask(void *pvParameters)
 {
   for (;;) {
-    //    Serial.println("FastLEDshowTask");
-    //    FastLED.show();
-    delay(100);
+    ledAnimator.update();
+    delay(1);
   }
 }
 
