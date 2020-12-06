@@ -21,6 +21,16 @@ CRGB leds[NUM_LEDS];
 static TaskHandle_t FastLEDshowTaskHandle = 0;
 static TaskHandle_t userTaskHandle = 0;
 
+#include <M5BGMPlayer.h>
+M5BGMPlayer bgm;
+
+enum BGMTask {
+  None, Play, Stop
+};
+BGMTask bgmDesire = None;
+M5BGMPlayerTrack *bgmTrack = NULL;
+bool bgmInitialized = false;
+
 // https://github.com/lovyan03/M5Stack_TreeView
 #include <M5TreeView.h>
 M5TreeView tv;
@@ -91,8 +101,27 @@ void setup() {
   // Neopixel initialization
   pixels.begin();
   fill_solid(leds, NUM_LEDS, CRGB{0, 0, 0});
-  xTaskCreatePinnedToCore(FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2, NULL, 0);
 
+  // BGM initialization
+  if (!SD.begin()) {
+    Serial.println("Failed SD.begin()");
+  }
+  Serial.println("SD.begin()");
+  if (bgm.init()) {
+    Serial.println("Failed bgm.init()");
+  }
+  Serial.println("bgm.init()");
+  if (bgm.loadTrackListFromSD("/sounds")) {
+    Serial.println("Failed bgm.init()");
+  }
+  Serial.println("bgm.loadTrackListFromSD()");
+
+  bgmInitialized = true;
+  // XXX ESP8266Audio はメインループから使わないと落ちる。なんでかは見てない（多分分からない）。
+  //  xTaskCreatePinnedToCore(BGMUpdateTask, "BGMUpdateTask", 2048, NULL, 2, NULL, 1);
+
+  // Menu initialization
   tv.clientRect.x = 2;
   tv.clientRect.y = 2;
   tv.clientRect.w = 316;
@@ -114,6 +143,32 @@ void loop()
 {
   //  Serial.println("loop");
   tv.update();
+
+  if (bgmInitialized) {
+    switch (bgmDesire) {
+      case Play:
+        bgm.play(bgmTrack);
+        break;
+      case Stop:
+        bgm.stop();
+        break;
+      default: break;
+    }
+    bgmDesire = None;
+    bgm.update();
+    //    if (!bgm.isPlaying()) {
+    //      if (bgmTrack) {
+    //        bgmTrack = bgmTrack->right;
+    //      }
+    //      if (!bgmTrack) {
+    //        bgmTrack = bgm.trackList();
+    //      }
+    //      if (bgmTrack) {
+    //        Serial.println(bgmTrack->path);
+    //      }
+    //      bgmDesire = Play;
+    //    }
+  }
 }
 
 void FastLEDshowTask(void *pvParameters)
@@ -122,5 +177,24 @@ void FastLEDshowTask(void *pvParameters)
     //    Serial.println("FastLEDshowTask");
     //    FastLED.show();
     delay(100);
+  }
+}
+
+void BGMUpdateTask(void *pvParameters)
+{
+  for (;;) {
+    switch (bgmDesire) {
+      case Play:
+        bgm.play(bgmTrack);
+        break;
+      case Stop:
+        bgm.stop();
+        break;
+      default: break;
+    }
+    bgmDesire = None;
+    bgm.update();
+
+    delay(1);
   }
 }
