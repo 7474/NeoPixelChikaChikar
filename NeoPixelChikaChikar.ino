@@ -6,6 +6,10 @@
 */
 #include <M5Stack.h>
 
+// LCD
+// 下半分UI
+
+// NeoPixel
 // https://github.com/adafruit/Adafruit_NeoPixe
 #include <Adafruit_NeoPixel.h>
 #define Neopixel_PIN 21
@@ -21,6 +25,7 @@ CRGB leds[NUM_LEDS];
 static TaskHandle_t FastLEDshowTaskHandle = 0;
 static TaskHandle_t userTaskHandle = 0;
 
+// BGM
 #include <M5BGMPlayer.h>
 M5BGMPlayer bgm;
 
@@ -51,8 +56,8 @@ void fill_solid(CRGB* pLeds, int num, const CRGB& val) {
 
 void updateLeds() {
   // Update LCD
-  M5.Lcd.fillRect(0, 120, 320, 100, 0);
-  M5.Lcd.fillRect(0, 140, 80, 8, M5.Lcd.color565(
+  M5.Lcd.fillRect(0, 0, 320, 100, 0);
+  M5.Lcd.fillRect(0, 20, 80, 20, M5.Lcd.color565(
                     leds[ledCurrentNum].r,
                     leds[ledCurrentNum].g,
                     leds[ledCurrentNum].b));
@@ -63,7 +68,7 @@ void updateLeds() {
           leds[ledCurrentNum].r,
           leds[ledCurrentNum].g,
           leds[ledCurrentNum].b);
-  M5.Lcd.drawString(ledBuf, 2, 122, 1);
+  M5.Lcd.drawString(ledBuf, 2, 2, 1);
   Serial.println(ledBuf);
 
   // Update pixels
@@ -73,6 +78,8 @@ void updateLeds() {
                          leds[ledCurrentNum].b));
   pixels.show();
 }
+
+// Callbask
 void ledNumSel(MenuItem* mi) {
   if (ledCurrentNum + 1 < NUM_LEDS) {
     ledCurrentNum += 1;
@@ -94,56 +101,88 @@ void ledBSel(MenuItem* mi) {
   updateLeds();
 }
 
-void setup() {
+void bgmSel(MenuItem* mi) {
+  int no = mi->tag;
+  M5BGMPlayerTrack *selectedTrack = NULL;
+  for (M5BGMPlayerTrack *tmpTrack = bgm.trackList(); tmpTrack; tmpTrack = tmpTrack->right) {
+    if (tmpTrack->no == no) {
+      selectedTrack=tmpTrack;
+      break;
+    }
+  }
+  if(selectedTrack) {
+    bgmTrack = selectedTrack;
+    bgmDesire = Play;
+  }
+}
+
+// Setup
+void setupM5() {
   M5.begin();
   M5.Power.begin();
-
-  // Neopixel initialization
-  pixels.begin();
-  fill_solid(leds, NUM_LEDS, CRGB{0, 0, 0});
-  xTaskCreatePinnedToCore(FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2, NULL, 0);
-
-  // BGM initialization
   if (!SD.begin()) {
     Serial.println("Failed SD.begin()");
   }
-  Serial.println("SD.begin()");
-  if (bgm.init()) {
+  Serial.println("End SD.begin()");
+}
+
+void setupNeoPixel() {
+  pixels.begin();
+  fill_solid(leds, NUM_LEDS, CRGB{0, 0, 0});
+  xTaskCreatePinnedToCore(FastLEDshowTask, "FastLEDshowTask", 2048, NULL, 2, NULL, 0);
+}
+
+void setupBgm() {
+  if (!bgm.init()) {
     Serial.println("Failed bgm.init()");
   }
-  Serial.println("bgm.init()");
-  if (bgm.loadTrackListFromSD("/sounds")) {
-    Serial.println("Failed bgm.init()");
+  Serial.println("End bgm.init()");
+  if (!bgm.loadTrackListFromSD("/sounds")) {
+    Serial.println("Failed bgm.loadTrackListFromSD()");
   }
-  Serial.println("bgm.loadTrackListFromSD()");
+  Serial.println("End bgm.loadTrackListFromSD()");
 
   bgmInitialized = true;
-  // XXX ESP8266Audio はメインループから使わないと落ちる。なんでかは見てない（多分分からない）。
-  //  xTaskCreatePinnedToCore(BGMUpdateTask, "BGMUpdateTask", 2048, NULL, 2, NULL, 1);
 
+  // XXX ESP8266Audio はメインループから使わないと落ちる。なんでかは見てない（多分分からない）。
+  // SDカードじゃなくてスピーカ出力のほうで落ちてる感じではあった。
+  //  xTaskCreatePinnedToCore(BGMUpdateTask, "BGMUpdateTask", 2048, NULL, 2, NULL, 1);
+}
+
+void setupMenu() {
+  std::vector<MenuItem*> bgmMenu;
+  for (M5BGMPlayerTrack *tmpTrack = bgm.trackList(); tmpTrack; tmpTrack = tmpTrack->right) {
+    bgmMenu.push_back(new MenuItem(tmpTrack->path,tmpTrack->no, bgmSel));
+    Serial.println(tmpTrack->path);
+  }
   // Menu initialization
-  tv.clientRect.x = 2;
-  tv.clientRect.y = 2;
-  tv.clientRect.w = 316;
-  tv.clientRect.h = 118;
+  tv.clientRect.x = 0;
+  tv.clientRect.y = 120;
+  tv.clientRect.w = 320;
+  tv.clientRect.h = 104;
   tv.setItems(std::vector<MenuItem*>
-  { new MenuItem( "NeoPixel", std::vector<MenuItem*>{
-      new MenuItem( "Sel LED", ledNumSel)
-      , new MenuItem( "R", ledRSel)
-      , new MenuItem( "G", ledGSel)
-      , new MenuItem( "B", ledBSel)
-    })
+  { new MenuItem("NeoPixel", std::vector<MenuItem*>{
+      new MenuItem("Sel LED", ledNumSel)
+      , new MenuItem("R", ledRSel)
+      , new MenuItem("G", ledGSel)
+      , new MenuItem("B", ledBSel)
+    }),
+    new MenuItem("BGM", bgmMenu),
   });
   tv.begin();
+}
+
+void setup() {
+  setupM5();
+  setupNeoPixel();
+  setupBgm();
+  setupMenu();
 
   updateLeds();
 }
 
-void loop()
-{
-  //  Serial.println("loop");
-  tv.update();
-
+// Loop
+void loopBgm() {
   if (bgmInitialized) {
     switch (bgmDesire) {
       case Play:
@@ -156,21 +195,16 @@ void loop()
     }
     bgmDesire = None;
     bgm.update();
-    //    if (!bgm.isPlaying()) {
-    //      if (bgmTrack) {
-    //        bgmTrack = bgmTrack->right;
-    //      }
-    //      if (!bgmTrack) {
-    //        bgmTrack = bgm.trackList();
-    //      }
-    //      if (bgmTrack) {
-    //        Serial.println(bgmTrack->path);
-    //      }
-    //      bgmDesire = Play;
-    //    }
   }
 }
 
+void loop()
+{
+  tv.update();
+  loopBgm();
+}
+
+// Task
 void FastLEDshowTask(void *pvParameters)
 {
   for (;;) {
@@ -183,18 +217,7 @@ void FastLEDshowTask(void *pvParameters)
 void BGMUpdateTask(void *pvParameters)
 {
   for (;;) {
-    switch (bgmDesire) {
-      case Play:
-        bgm.play(bgmTrack);
-        break;
-      case Stop:
-        bgm.stop();
-        break;
-      default: break;
-    }
-    bgmDesire = None;
-    bgm.update();
-
+    loopBgm();
     delay(1);
   }
 }
