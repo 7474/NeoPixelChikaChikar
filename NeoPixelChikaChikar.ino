@@ -4,7 +4,7 @@
 // 下半分UI
 
 // NeoPixel
-// https://github.com/adafruit/Adafruit_NeoPixe
+// https://github.com/adafruit/Adafruit_NeoPixel
 #include <Adafruit_NeoPixel.h>
 #define Neopixel_PIN 21
 #define Neopixel_NUM_LEDS 15
@@ -198,14 +198,15 @@ void setupMenu() {
   tv.clientRect.w = 320;
   tv.clientRect.h = 104;
   tv.setItems(std::vector<MenuItem*>
-  { new MenuItem("NeoPixel", std::vector<MenuItem*>{
-      new MenuItem("Sel LED", ledNumSel)
-      , new MenuItem("R", ledRSel)
-      , new MenuItem("G", ledGSel)
-      , new MenuItem("B", ledBSel)
-    }),
+  {
     new MenuItem("BGM", bgmMenu),
     new MenuItem("LED", ledMenu),
+    new MenuItem("Test LED", std::vector<MenuItem*>{
+      new MenuItem("Sel LED", ledNumSel),
+      new MenuItem("R", ledRSel),
+      new MenuItem("G", ledGSel),
+      new MenuItem("B", ledBSel)
+    }),
   });
   tv.begin();
 }
