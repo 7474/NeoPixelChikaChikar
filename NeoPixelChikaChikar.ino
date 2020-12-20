@@ -122,6 +122,19 @@ void bgmSel(MenuItem* mi) {
   }
 }
 
+// XXX ちゃんと読む実装ができなかった。
+M5BGMPlayerTrack hariboteTrack{0, "/sounds/ssjin.mp3", NULL, NULL};
+void scenarioSel(MenuItem* mi) {
+  if (ledAnimator.isPlaying()) {
+    ledAnimator.stop();
+    bgmDesire = Stop;
+  } else {
+    ledAnimator.start();
+    bgmTrack = &hariboteTrack;
+    bgmDesire = Play;
+  }
+}
+
 // Setup
 void setupM5() {
   M5.begin();
@@ -185,13 +198,19 @@ void setupBgm() {
 }
 
 void setupMenu() {
+  //
   std::vector<MenuItem*> bgmMenu;
   for (M5BGMPlayerTrack *tmpTrack = bgm.trackList(); tmpTrack; tmpTrack = tmpTrack->right) {
     bgmMenu.push_back(new MenuItem(tmpTrack->path, tmpTrack->no, bgmSel));
     Serial.println(tmpTrack->path);
   }
+  //
   std::vector<MenuItem*> ledMenu;
   ledMenu.push_back(new MenuItem("SSJ Static", 0, ledAnimeSel));
+  //
+  std::vector<MenuItem*> scenarioMenu;
+  scenarioMenu.push_back(new MenuItem("SSJ Haribote", 0, scenarioSel));
+  
   // Menu initialization
   tv.clientRect.x = 0;
   tv.clientRect.y = 120;
@@ -199,6 +218,7 @@ void setupMenu() {
   tv.clientRect.h = 104;
   tv.setItems(std::vector<MenuItem*>
   {
+    new MenuItem("Scenario", scenarioMenu),
     new MenuItem("BGM", bgmMenu),
     new MenuItem("LED", ledMenu),
     new MenuItem("Test LED", std::vector<MenuItem*>{
