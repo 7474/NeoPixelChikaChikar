@@ -1,0 +1,21 @@
+#ifndef __CHIKASCENARIO_H__
+#define __CHIKASCENARIO_H__
+
+#include <LEDAnimator.h>
+#include <M5BGMPlayer.h>
+
+class ChikaScenario
+{
+public:
+    ChikaScenario(LEDAnimator<Neopixel_NUM_LEDS> &led, M5BGMPlayer &bgm);
+
+    load(String& path);
+    play();
+    stop();
+
+private:
+    LEDAnimator<Neopixel_NUM_LEDS> &led;
+    M5BGMPlayer &bgm;
+};
+
+#endif // __CHIKASCENARIO_H__

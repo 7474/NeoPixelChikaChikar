@@ -1,0 +1,22 @@
+
+#include "ChikaScenario.h"
+
+ChikaScenario::ChikaScenario(LEDAnimator<Neopixel_NUM_LEDS> &led, M5BGMPlayer &bgm) 
+{
+    
+}
+
+ChikaScenario::load(String& path) 
+{
+    
+}
+
+ChikaScenario::play() 
+{
+    
+}
+
+ChikaScenario::stop() 
+{
+    
+}
